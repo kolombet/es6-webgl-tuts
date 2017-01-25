@@ -13,13 +13,9 @@ class WebGL {
 
         const vertexShaderSource = `
             attribute vec4 a_Position;
-            uniform float u_CosB, u_SinB;
-            uniform vec4 u_Translation;
+            uniform mat4 u_xformMatrix;
             void main() {
-                gl_Position.x = a_Position.x * u_CosB - a_Position.y * u_SinB;
-                gl_Position.y = a_Position.x * u_SinB + a_Position.y * u_CosB;
-                gl_Position.z = a_Position.z;
-                gl_Position.w = 1.0;
+                gl_Position = u_xformMatrix * a_Position;
             }
         `
 
@@ -46,51 +42,32 @@ class WebGL {
         gl.attachShader(this.shader, vertexShader);
         gl.attachShader(this.shader, fragmentShader);
         gl.linkProgram(this.shader);
-
         gl.useProgram(this.shader);
-
-        this.draw();
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        
+        this.a_Position = this.gl.getAttribLocation(this.shader, 'a_Position');
+        this.u_FragColor = this.gl.getUniformLocation(this.shader, 'u_FragColor');
+        this.u_xformMatrix = this.gl.getUniformLocation(this.shader, 'u_xformMatrix');
+        this.xformMatrix = new Matrix4();
+        this.vertexBuffers = this.initVertexBuffers();
 
         this.tick = 0;
+
+        this.draw();
     }
     
     draw() {
         this.tick++;
         var s = Math.sin(this.tick/100);
-        this.translate[0] = s - .5;
+        this.xformMatrix.setRotate(this.angle*s, 0, 0, 1);
+        this.xformMatrix.translate(0.35, 0, 0);
 
-        const radian = Math.PI * this.angle / 180.0 * s;
-        const cosB = Math.cos(radian);
-        const sinB = Math.sin(radian);
+        this.gl.vertexAttrib3f(this.a_Position, s, 0.0, 0.0);
+        this.gl.uniform4f(this.u_FragColor, 1.0, s, 0.0, 1.0);
+        this.gl.uniformMatrix4fv(this.u_xformMatrix, false, this.xformMatrix.elements);
 
-        const a_Position = this.gl.getAttribLocation(this.shader, 'a_Position');
-        const u_FragColor = this.gl.getUniformLocation(this.shader, 'u_FragColor');
-        const u_Translation = this.gl.getUniformLocation(this.shader, 'u_Translation');
-        const u_CosB = this.gl.getUniformLocation(this.shader, 'u_CosB');
-        const u_SinB = this.gl.getUniformLocation(this.shader, 'u_SinB');
-
-        if (u_FragColor < 0) {
-            console.log('error');
-            return;
-        }
-        this.gl.vertexAttrib3f(a_Position, s, 0.0, 0.0);
-        this.gl.uniform4f(u_FragColor, 1.0, s, 0.0, 1.0);
-        this.gl.uniform4f(u_Translation, this.translate[0], this.translate[1], this.translate[2], 0.0);
-        this.gl.uniform1f(u_CosB, cosB);
-        this.gl.uniform1f(u_SinB, sinB);
-
-        // var n = 1;
-        var n = this.initVertexBuffers(); 
-        if (n < 0) {  
-             console.log('Failed to set the positions of the vertices'); 
-             return;
-        } 
-
-
-        this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-
-        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, n);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, this.vertexBuffers);
         window.requestAnimationFrame(this.draw.bind(this));
     }
 
